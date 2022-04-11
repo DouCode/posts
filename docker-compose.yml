@@ -1,0 +1,56 @@
+version: "3.9"
+
+services:
+  api:
+    image: postgin
+    environment:
+      - MONGO_URI=mongodb://admin:password@mongodb:27017/test?authSource=admin&readPreference=primary&ssl=false
+      - MONGO_DATABASE=demo
+      - REDIS_URI=redis:6379
+    networks:
+      - post_network
+    ports:
+      - 1016:1016
+    external_links:
+      - mongodb
+      - redis
+    scale: 1
+
+  dashboard:
+    image: postvue
+    ports:
+      - 8080:8080
+    networks:
+      - post_network
+
+  redis:
+    image: redis
+    networks:
+      - post_network
+    ports:
+      - 6379:6379
+
+  mongodb:
+    image: mongo:4.4.3
+    networks:
+      - post_network
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+
+  nginx:
+    image: nginx
+    ports:
+      - 80:80
+    volumes:
+      - $PWD/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api
+      - dashboard
+    networks:
+      - post_network
+
+networks:
+  post_network:
