@@ -16,13 +16,6 @@ services:
       - redis
     scale: 1
 
-  dashboard:
-    image: doucode/vuetest
-    ports:
-      - 8080:8080
-    networks:
-      - post_network
-
   redis:
     image: redis
     networks:
@@ -48,7 +41,6 @@ services:
       - $PWD/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       - api
-      - dashboard
     networks:
       - post_network
 
