@@ -13,10 +13,10 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-func ReleaseToken(user models.User) (string, error) {
+func ReleaseToken(form models.Form) (string, error) {
 	expirationTime := time.Now().Add(7 * 24 * time.Hour)
 	claims := &Claims{
-		UserName: user.Username,
+		UserName: form.Name,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationTime.Unix(), //token失效时间
 			IssuedAt:  time.Now().Unix(),     //token发放时间

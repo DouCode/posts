@@ -6,3 +6,9 @@ type CreatePostRequest struct {
 	HeadImg    string `json:"head_img"`
 	Content    string `json:"content" binding:"required"`
 }
+
+type CreateBlogRequest struct {
+	Title   string `json:"blogTitle" binding:"required,max=10"`
+	Content string `json:"blogBody" binding:"required"`
+	TagStr  string `json:"tagId" binding:"required"`
+}

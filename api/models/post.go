@@ -15,4 +15,6 @@ type Post struct {
 	Content     string    `json:"content" gorm:"tyep:text;not null" bson:"content"`
 	PublishedAt time.Time `json:"publishedAt" bson:"publishedAt"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"type:timestamp" bson:"updatedAt"`
+	Tags        string    `json:"tags" bson:"tags"`
+	UserName    string    `json:"username" bson:"username"`
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"building-distributed-app-in-gin-chapter06/api/common"
 	"building-distributed-app-in-gin-chapter06/api/models"
 	"building-distributed-app-in-gin-chapter06/api/response"
 	"building-distributed-app-in-gin-chapter06/api/vo"
@@ -93,7 +94,7 @@ func (p PostController) Show(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"post": post}, "成功")
+	response.Success(c, gin.H{"data": post}, "成功")
 }
 
 func (p PostController) Delete(c *gin.Context) {
@@ -109,9 +110,39 @@ func (p PostController) Delete(c *gin.Context) {
 	response.Success(c, gin.H{"post": ""}, "删除成功")
 }
 
+func (p PostController) NewBlog(c *gin.Context) {
+	var requestPost vo.CreateBlogRequest
+	if err := c.ShouldBindJSON(&requestPost); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	tokenString := c.GetHeader("Authorization")
+	_, claims, _ := common.ParseToken(tokenString)
+	userName := claims.UserName
+
+	var post = models.Post{}
+	post.Title = requestPost.Title
+	post.Content = requestPost.Content
+	post.Tags = requestPost.TagStr
+	post.ID = primitive.NewObjectID()
+	post.PublishedAt = time.Now()
+	post.UserName = userName
+
+	_, err := p.collection.InsertOne(p.ctx, post)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error while inserting a new post"})
+		return
+	}
+
+	log.Println("Remove data from Redis")
+	p.redisClient.Del("posts")
+
+	c.JSON(http.StatusOK, post)
+}
+
 func (p PostController) PageList(c *gin.Context) {
 	// 获取分页参数
-	pageNum, _ := strconv.Atoi(c.DefaultQuery("pageNum", ""))
+	pageNum, _ := strconv.Atoi(c.DefaultQuery("currentPage", ""))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", ""))
 
 	//val, err := p.redisClient.Get("posts").Result()
@@ -143,7 +174,7 @@ func (p PostController) PageList(c *gin.Context) {
 	if b > total {
 		b = total
 	}
-	response.Success(c, gin.H{"data": posts[a:b], "total": total}, "成功")
+	response.Success(c, gin.H{"rows": posts[a:b], "total": total}, "成功")
 	//} else if err != nil {
 	//	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	//	return

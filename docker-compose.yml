@@ -17,7 +17,7 @@ services:
     scale: 1
 
   dashboard:
-    image: postvue
+    image: doucode/vuetest
     ports:
       - 8080:8080
     networks:

@@ -14,7 +14,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -33,14 +32,16 @@ func NewAuthHandler(ctx context.Context, collection *mongo.Collection) *AuthHand
 }
 
 func (handler *AuthHandler) RegisterHandler(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	var form models.Form
+	if err := c.ShouldBindJSON(&form); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	name := user.Username
-	telephone := user.Telephone
-	password := user.Password
+	name := form.Name
+	telephone := form.Telephone
+	password := form.Password
+	inviteCode := form.InviteCode
+	mail := form.Mail
 
 	//数据验证
 	if len(telephone) != 11 {
@@ -62,9 +63,9 @@ func (handler *AuthHandler) RegisterHandler(c *gin.Context) {
 	cur := handler.collection.FindOne(handler.ctx, bson.M{
 		"telephone": telephone,
 	})
-	err := cur.Decode(&user)
+	err := cur.Decode(&form)
 	if err == nil {
-		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "用户已注册")
+		response.Response(c, http.StatusUnprocessableEntity, 423, nil, "用户已注册")
 		return
 	}
 
@@ -77,23 +78,25 @@ func (handler *AuthHandler) RegisterHandler(c *gin.Context) {
 	}
 
 	//创建用户
-	newUser := models.User{
+	newForm := models.Form{
 		ID:           id,
-		Username:     name,
+		Name:         name,
 		Telephone:    telephone,
 		Password:     string(hasedPassword),
+		InviteCode:   inviteCode,
+		Mail:         mail,
 		RegisteredAt: registeredAt,
 	}
 
 	//写入数据库
-	_, error := handler.collection.InsertOne(handler.ctx, newUser)
+	_, error := handler.collection.InsertOne(handler.ctx, newForm)
 	if error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error while inserting a new user"})
 		return
 	}
 
 	//发放token
-	token, err := common.ReleaseToken(newUser)
+	token, err := common.ReleaseToken(newForm)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "系统异常"})
 		log.Printf("token generate error : %v", err)
@@ -101,26 +104,36 @@ func (handler *AuthHandler) RegisterHandler(c *gin.Context) {
 	}
 
 	//返回结果
-	response.Success(c, gin.H{"token": token}, "注册成功")
-
+	response.Success(c, gin.H{"token": token, "name": telephone, "roles": "admin"}, "注册成功")
 }
 
 func (handler *AuthHandler) SignInHandler(c *gin.Context) {
-	var user models.User
-	if err := c.ShouldBindJSON(&user); err != nil {
+	//var user models.User
+	var form models.Form
+
+	log.Println("0")
+
+	//if err := c.ShouldBindJSON(&user); err != nil {
+	//	c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	//	return
+	//}
+	if err := c.ShouldBindJSON(&form); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	//获取参数
-	telephone := user.Telephone
-	password := user.Password
+	//telephone := user.Telephone
+	//password := user.Password
+	telephone := form.Telephone
+	password := form.Password
 
-	//数据验证
+	////数据验证
 	if len(telephone) != 11 {
 		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "手机号必须为11位")
 		return
 	}
+
 	if len(password) < 6 {
 		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "密码不能少于6位")
 		return
@@ -130,7 +143,7 @@ func (handler *AuthHandler) SignInHandler(c *gin.Context) {
 	cur := handler.collection.FindOne(handler.ctx, bson.M{
 		"telephone": telephone,
 	})
-	var dbuser models.User
+	var dbuser models.Form
 	err := cur.Decode(&dbuser)
 	if err != nil {
 		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "该手机号未注册")
@@ -152,23 +165,29 @@ func (handler *AuthHandler) SignInHandler(c *gin.Context) {
 	}
 
 	//返回结果
-	response.Success(c, gin.H{"token": token}, "登陆成功")
-
+	response.Success(c, gin.H{"token": token, "name": dbuser.Name, "roles": "admin"}, "登陆成功")
 }
 
 func (handler *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		//获取authorization header
 		tokenString := ctx.GetHeader("Authorization")
+		log.Println(tokenString)
 
 		//validate token format
-		if tokenString == "" || !strings.HasPrefix(tokenString, "Bearer ") {
+		//if tokenString == "" || !strings.HasPrefix(tokenString, "Bearer ") {
+		//	ctx.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "权限不足1"})
+		//	ctx.Abort()
+		//	return
+		//}
+		if tokenString == "" {
 			ctx.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "权限不足1"})
 			ctx.Abort()
 			return
 		}
+		log.Println("0")
 
-		tokenString = tokenString[7:]
+		//tokenString = tokenString[7:]
 
 		token, claims, err := common.ParseToken(tokenString)
 		if err != nil || !token.Valid {
@@ -176,14 +195,15 @@ func (handler *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 			ctx.Abort()
 			return
 		}
+		log.Println("1")
 
 		//验证通过后获取claims中的userid
 		userName := claims.UserName
-		var user models.User
+		var user models.Form
 
 		log.Println(userName)
 		cur := handler.collection.FindOne(handler.ctx, bson.M{
-			"username": userName,
+			"name": userName,
 		})
 		err1 := cur.Decode(&user)
 		if err1 != nil {
@@ -191,6 +211,7 @@ func (handler *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 			ctx.Abort()
 			return
 		}
+		log.Println("3")
 
 		//如果用户存在，将user的信息写入上下文
 		ctx.Set("user", user)
@@ -201,6 +222,28 @@ func (handler *AuthHandler) AuthMiddleware() gin.HandlerFunc {
 func (handler *AuthHandler) Info(c *gin.Context) {
 	user, _ := c.Get("user")
 	c.JSON(http.StatusOK, gin.H{"code": 200, "data": gin.H{"user": dto.ToUserDto(user.(models.User))}})
+}
+
+func (handler *AuthHandler) LogOutHandler(c *gin.Context) {
+	response.Success(c, gin.H{}, "成功退出登录")
+}
+
+func (handler *AuthHandler) IntroductionHandler(c *gin.Context) {
+	response.Success(c, gin.H{"introduction": "这里是DXW的博客"}, "介绍")
+}
+
+type tag struct {
+	Id   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+func (handler *AuthHandler) TagHandler(c *gin.Context) {
+	golang := tag{1, "golang"}
+	java := tag{2, "java"}
+	mysql := tag{3, "mysql"}
+	tags := make([]tag, 0)
+	tags = append(tags, golang, java, mysql)
+	response.Success(c, gin.H{"data": tags}, "tags")
 }
 
 //

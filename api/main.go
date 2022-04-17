@@ -64,8 +64,13 @@ func main() {
 	router := gin.Default()
 	router.Use(middleware.CORSMiddleware())
 
-	router.POST("/api/auth/register", authHandler.RegisterHandler)
-	router.POST("/api/auth/login", authHandler.SignInHandler)
+	router.POST("/user/register", authHandler.RegisterHandler)
+	router.POST("/user/login", authHandler.SignInHandler)
+	router.GET("/user/logout", authHandler.LogOutHandler)
+	router.GET("/site", authHandler.IntroductionHandler)
+
+	router.GET("/tag", authHandler.TagHandler)
+
 	router.GET("/api/auth/info", authHandler.AuthMiddleware(), authHandler.Info)
 	//router.POST("/refresh", authHandler.RefreshHandler)
 
@@ -80,10 +85,11 @@ func main() {
 	}
 
 	postRoutes := router.Group("/")
-	postRoutes.GET("/posts/:id", postController.Show)
-	postRoutes.GET("/posts/page/list", postController.PageList)
+	postRoutes.GET("/blog/:id"+"/false", postController.Show)
+	postRoutes.GET("/blog/home", postController.PageList)
 	postRoutes.Use(authHandler.AuthMiddleware())
 	postRoutes.POST("/posts", postController.Create)
+	postRoutes.POST("/blog", postController.NewBlog)
 	postRoutes.PUT("/posts/:id", postController.Update)
 	postRoutes.DELETE("/posts/:id", postController.Delete)
 
