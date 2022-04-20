@@ -20,13 +20,14 @@ import (
 	"building-distributed-app-in-gin-chapter06/api/handlers"
 	"building-distributed-app-in-gin-chapter06/api/middleware"
 	"context"
+	"log"
+	"os"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
-	"log"
-	"os"
 )
 
 var authHandler *handlers.AuthHandler
@@ -86,12 +87,12 @@ func main() {
 
 	postRoutes := router.Group("/")
 	postRoutes.GET("/blog/:id"+"/false", postController.Show)
+	postRoutes.GET("/blog/:id"+"/true", postController.Edit)
 	postRoutes.GET("/blog/home", postController.PageList)
 	postRoutes.Use(authHandler.AuthMiddleware())
-	postRoutes.POST("/posts", postController.Create)
 	postRoutes.POST("/blog", postController.NewBlog)
-	postRoutes.PUT("/posts/:id", postController.Update)
-	postRoutes.DELETE("/posts/:id", postController.Delete)
+	postRoutes.PUT("/blog/:id", postController.EditBlog)
+	postRoutes.DELETE("/blog/admin/:id", postController.Delete)
 
 	router.Run(":1016")
 }
