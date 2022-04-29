@@ -6,6 +6,7 @@ import (
 	"building-distributed-app-in-gin-chapter06/api/response"
 	"building-distributed-app-in-gin-chapter06/api/vo"
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -139,51 +140,88 @@ func (p PostController) EditBlog(c *gin.Context) {
 	response.Success(c, gin.H{"post": post}, "更新成功")
 }
 
+//
+//func (p PostController) PageList(c *gin.Context) {
+//	// 获取分页参数
+//	pageNum, _ := strconv.Atoi(c.DefaultQuery("currentPage", ""))
+//	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", ""))
+//
+//	log.Printf("Request to MongoDB")
+//
+//	findOptions := options.Find()
+//	// Sort by `price` field descending
+//	findOptions.SetSort(bson.D{{"publishedAt", -1}})
+//	cur, err := p.collection.Find(p.ctx, bson.M{}, findOptions)
+//	if err != nil {
+//		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+//		return
+//	}
+//	defer cur.Close(p.ctx)
+//
+//	posts := make([]models.Post, 0)
+//	for cur.Next(p.ctx) {
+//		var post models.Post
+//		cur.Decode(&post)
+//		posts = append(posts, post)
+//	}
+//	total := len(posts)
+//
+//	a := (pageNum - 1) * pageSize
+//	b := pageNum * pageSize
+//	if b > total {
+//		b = total
+//	}
+//	response.Success(c, gin.H{"rows": posts[a:b], "total": total}, "成功")
+//}
+
 func (p PostController) PageList(c *gin.Context) {
 	// 获取分页参数
 	pageNum, _ := strconv.Atoi(c.DefaultQuery("currentPage", ""))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", ""))
 
-	//val, err := p.redisClient.Get("posts").Result()
-	//if err == redis.Nil {
-	log.Printf("Request to MongoDB")
+	val, err := p.redisClient.Get("posts").Result()
+	if err == redis.Nil {
+		log.Printf("Request to MongoDB")
+		findOptions := options.Find()
+		// Sort by `price` field descending
+		findOptions.SetSort(bson.D{{"publishedAt", -1}})
+		cur, err := p.collection.Find(p.ctx, bson.M{}, findOptions)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		defer cur.Close(p.ctx)
 
-	findOptions := options.Find()
-	// Sort by `price` field descending
-	findOptions.SetSort(bson.D{{"publishedAt", -1}})
-	cur, err := p.collection.Find(p.ctx, bson.M{}, findOptions)
-	if err != nil {
+		posts := make([]models.Post, 0)
+		for cur.Next(p.ctx) {
+			var post models.Post
+			cur.Decode(&post)
+			posts = append(posts, post)
+		}
+		data, _ := json.Marshal(posts)
+		p.redisClient.Set("posts", string(data), 0)
+
+		total := len(posts)
+		a := (pageNum - 1) * pageSize
+		b := pageNum * pageSize
+		if b > total {
+			b = total
+		}
+		response.Success(c, gin.H{"rows": posts[a:b], "total": total}, "成功")
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	}
-	defer cur.Close(p.ctx)
+	} else {
+		log.Printf("Request to Redis")
+		posts := make([]models.Post, 0)
+		json.Unmarshal([]byte(val), &posts)
+		total := len(posts)
 
-	posts := make([]models.Post, 0)
-	for cur.Next(p.ctx) {
-		var post models.Post
-		cur.Decode(&post)
-		posts = append(posts, post)
+		a := (pageNum - 1) * pageSize
+		b := pageNum * pageSize
+		if b > total {
+			b = total
+		}
+		response.Success(c, gin.H{"rows": posts[a:b], "total": total}, "成功")
 	}
-	total := len(posts)
-
-	//data, _ := json.Marshal(posts)
-	//p.redisClient.Set("posts", string(data), 0)
-	a := (pageNum - 1) * pageSize
-	b := pageNum * pageSize
-	if b > total {
-		b = total
-	}
-	response.Success(c, gin.H{"rows": posts[a:b], "total": total}, "成功")
-	//} else if err != nil {
-	//	c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-	//	return
-	//} else {
-	//	log.Printf("Request to Redis")
-	//	posts := make([]models.Post, 0)
-	//	total := len(posts)
-	//	json.Unmarshal([]byte(val), &posts)
-	//	a := (pageNum - 1) * pageSize
-	//	b := pageNum * pageSize
-	//	response.Success(c, gin.H{"data": posts[a:b], "total": total}, "成功")
-	//}
 }
