@@ -52,6 +52,10 @@ func (handler *AuthHandler) RegisterHandler(c *gin.Context) {
 		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "密码不能少于6位")
 		return
 	}
+	if inviteCode != 123321 {
+		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "邀请码错误")
+		return
+	}
 	//如果没有输入名称，则给一个10位的随机字符串
 	log.Println(name)
 	if len(name) == 0 {
