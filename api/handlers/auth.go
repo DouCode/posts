@@ -52,7 +52,7 @@ func (handler *AuthHandler) RegisterHandler(c *gin.Context) {
 		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "密码不能少于6位")
 		return
 	}
-	if inviteCode != 123321 {
+	if inviteCode != "123321" {
 		response.Response(c, http.StatusUnprocessableEntity, 422, nil, "邀请码错误")
 		return
 	}
