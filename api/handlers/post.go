@@ -180,7 +180,7 @@ func (p PostController) PageList(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", ""))
 
 	val, err := p.redisClient.Get("posts").Result()
-	if err == redis.Nil {
+	if err != redis.Nil {
 		log.Printf("Request to MongoDB")
 		findOptions := options.Find()
 		// Sort by `price` field descending
@@ -208,9 +208,9 @@ func (p PostController) PageList(c *gin.Context) {
 			b = total
 		}
 		response.Success(c, gin.H{"rows": posts[a:b], "total": total}, "成功")
-	} else if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+// 	} else if err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// 		return
 	} else {
 		log.Printf("Request to Redis")
 		posts := make([]models.Post, 0)
